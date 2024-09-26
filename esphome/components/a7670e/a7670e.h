@@ -4,56 +4,77 @@
 #include "esphome/components/uart/uart.h"
 
 namespace esphome {
-namespace a76xx {
-class A76XXComponent : public PollingComponent, public uart::UARTComponent, public text_sensor::TextSensor {
+namespace a7670e {
+
+enum State {
+  STATE_INIT = 0,
+  STATE_IDLE,
+  STATE_AWAIT_CMD_AT,
+  STATE_ERROR_CMD_AT,
+  STATE_AWAIT_CMD_COPS_CURRENT,
+  STATE_ERROR_CMD_COPS_CURRENT,
+};
+
+static const uint32_t NO_EXPIRATION = -1;
+static const char ASCII_CR = 0x0D;
+static const char ASCII_LF = 0x0A;
+
+class A7670EComponent : public PollingComponent, public uart::UARTDevice {
  public:
   void setup() override;
   void dump_config() override;
   void update() override;
+  void loop() override;
 
  protected:
-  int command_timeout;
+  bool command_pending_{false};
+  uint32_t command_expiration_time_{-1};
+  std::vector<uint8_t> command_response_data_;
+  State state_{STATE_INIT};
 
-  const char *read_string_rn() { return this->read_string_delimited("\r\n"); }
+  /**
+   * Reads any available UART data into the command response data buffer.
+   *
+   * If the read byte is a line feed the data is considered complete.
+   * Any non-printable characters are replaced with '?' and carriage returns are removed.
+   *
+   * @returns True if the data is complete, false if not
+   */
+  bool read_available_data();
 
-  const char *read_string_r() { return this->read_string_delimited("\r"); }
+  /**
+   * Checks whether the currently pending command (if any) has expired or not.
+   * @returns True if the currently pending command has taken longer than its configured expiration time. False if not
+   * expired or if no task is running.
+   */
+  bool is_command_expired();
 
-  const char *read_string_delimited(const char *delimiter) {
-    std::vector<uint8_t> byteArray;
+  /**
+   * Clears any command related data from the state.
+   */
+  void finish_command();
 
-    uint8_t read;
+  /**
+   * Invoked when the UART device has finished responding to the pending command.
+   * Make sure to also call finish_command();
+   */
+  void on_command_response();
 
-    int delimiterObservedCount = 0;
+  /**
+   * A utility method to set the current state of the state machine.
+   * Has the added benefit of traceability.
+   */
+  void set_state(State state);
 
-    while (this->read_byte(&read) && delimiterObservedCount < 2) {
-      byteArray.push_back(read);
+  /**
+   * Converts the data that is in the response buffer to a std::string.
+   */
+  std::string response_as_string();
 
-      if (compareLastBytes(byteArray, delimiter)) {
-        delimiterObservedCount++;
-      }
-    }
-
-    if (byteArray.back() == '\0') {  // If response is null-terminated string we can just cast it
-      return reinterpret_cast<const char *>(byteArray.data());
-    } else {  // Otherwise we add the terminator ourselves
-      char *cstr = new char[byteArray.size() + 1];
-      std::memcpy(cstr, byteArray.data(), byteArray.size());
-      cstr[byteArray.size()] = '\0';
-      return cstr;
-    }
-  }
-
-  bool compareLastBytes(const std::vector<uint8_t> &byteArray, const char *str) {
-    size_t strLength = std::strlen(str);
-
-    if (byteArray.size() < strLength) {
-      return false;
-    }
-
-    const uint8_t *vectorEnd = &byteArray[byteArray.size() - strLength];
-
-    return std::memcmp(vectorEnd, str, strLength) == 0;
-  }
+  /**
+   * Sends a command to the UART device.
+   */
+  void run_command(std::string cmd, uint32_t timeout);
 };
-}  // namespace a76xx
+}  // namespace a7670e
 }  // namespace esphome
