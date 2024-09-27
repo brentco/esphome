@@ -15,7 +15,7 @@ enum State {
   STATE_ERROR_CMD_COPS_CURRENT,
 };
 
-static const uint32_t NO_EXPIRATION = -1;
+static const uint32_t NO_EXPIRATION = 0;
 static const char ASCII_CR = 0x0D;
 static const char ASCII_LF = 0x0A;
 
@@ -28,7 +28,7 @@ class A7670EComponent : public PollingComponent, public uart::UARTDevice {
 
  protected:
   bool command_pending_{false};
-  uint32_t command_expiration_time_{-1};
+  uint32_t command_expiration_time_{0};
   std::vector<uint8_t> command_response_data_;
   State state_{STATE_INIT};
 

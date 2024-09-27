@@ -21,6 +21,10 @@ void A7670EComponent::update() {
       this->set_state(STATE_AWAIT_CMD_AT);
       this->run_command("AT", 1000);
       break;
+    default:
+      ESP_LOGE(TAG, "An unhandled state occurred in update: %i", this->state_);
+      this->set_state(STATE_IDLE);
+      break;
   }
 }
 
@@ -35,7 +39,7 @@ void A7670EComponent::loop() {
 bool A7670EComponent::read_available_data() {
   if (!this->command_pending_) {
     ESP_LOGD(TAG, "No data to read because no command is running");
-    return;
+    return false;
   }
 
   while (this->available()) {
@@ -101,13 +105,18 @@ void A7670EComponent::on_command_response() {
         ESP_LOGI(TAG, "It's alive");
         this->set_state(STATE_IDLE);
       }
+      break;
+    default:
+      ESP_LOGE(TAG, "An unhandled state occurred in on_command_response: %i", this->state_);
+      this->set_state(STATE_IDLE);
+      break;
   }
 
   this->finish_command();
 }
 
 void A7670EComponent::run_command(std::string cmd, uint32_t timeout) {
-  ESP_LOGV(TAG, "S: %s", cmd);
+  ESP_LOGV(TAG, "S: %s", cmd.c_str());
   this->write_str(cmd.c_str());
   this->command_pending_ = true;
   this->command_expiration_time_ = millis() + timeout;
