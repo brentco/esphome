@@ -17,7 +17,7 @@ void A7670EComponent::dump_config() {
 void A7670EComponent::update() {
   switch (this->state_) {
     case STATE_INIT:
-      ESP_LOGD(TAG, "Checking current network");
+      ESP_LOGD(TAG, "Initializing GSM module");
       this->set_state(STATE_AWAIT_CMD_AT);
       this->run_command("AT", 1000);
       break;
@@ -32,6 +32,7 @@ void A7670EComponent::loop() {
   if (this->command_pending_) {
     bool completed = this->read_available_data();
     if (completed) {
+      this->on_command_response();
     }
   }
 }
@@ -88,7 +89,7 @@ void A7670EComponent::set_state(State state) {
 
 std::string A7670EComponent::response_as_string() {
   if (this->command_response_data_.back() == '\0') {  // If response is null-terminated string we can just cast it
-    return std::string(reinterpret_cast<const char *>(this->command_response_data_.data()));
+    return std::string(this->command_response_data_.begin(), this->command_response_data_.end());
   } else {  // Otherwise we add the terminator ourselves
     char *cstr = new char[this->command_response_data_.size() + 1];
     std::memcpy(cstr, this->command_response_data_.data(), this->command_response_data_.size());
