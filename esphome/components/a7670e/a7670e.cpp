@@ -85,6 +85,9 @@ void A7670EComponent::finish_command() {
 void A7670EComponent::set_state(State state) {
   ESP_LOGD(TAG, "Setting state to %d", state);
   this->state_ = state;
+  if (this->state_sensor_ != nullptr) {
+    this->state_sensor_->publish_state(this->get_state_name());
+  }
 }
 
 std::string A7670EComponent::response_as_string() {
@@ -122,6 +125,17 @@ void A7670EComponent::run_command(std::string cmd, uint32_t timeout) {
   this->command_pending_ = true;
   this->command_expiration_time_ = millis() + timeout;
   this->write_byte(ASCII_CR);  // Commit the command
+}
+
+void A7670EComponent::send_sms(std::string message) {}
+
+std::string A7670EComponent::get_state_name() {
+  switch (this->state_) {
+    case STATE_INIT:
+      return "INIT";
+    default:
+      return "UNKNOWN#" + this->state_;
+  }
 }
 
 }  // namespace a7670e
